@@ -17,7 +17,6 @@ langchain==0.0.335
 
 # Email
 python-dotenv==1.0.0
-smtplib-ssl==1.0.0
 
 # Utilities
 pydantic==2.5.0
