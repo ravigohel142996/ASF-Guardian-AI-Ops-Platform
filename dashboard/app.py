@@ -1,558 +1,513 @@
 """
-ASF-Guardian Dashboard
-Main Streamlit application for enterprise AI Ops platform
+ASF-Guardian Enterprise Dashboard
+Professional AI Ops Platform UI
+Version 2.0.0
 """
 import streamlit as st
-import requests
 import sys
 import os
-from datetime import datetime
-import time
+from pathlib import Path
 
-# Add parent directory to path for imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add parent directory to path
+sys.path.append(str(Path(__file__).parent.parent))
 
-from dashboard.monitor import (
-    show_metric_card,
-    show_severity_badge,
-    show_status_badge,
-    create_incidents_timeline,
-    create_severity_distribution,
-    create_recovery_stats_chart,
-    show_incident_table,
-    show_system_metrics,
-    create_mttr_chart,
-    show_alert_settings
+# Import components
+from dashboard.components.navbar import render_navbar, render_sidebar, render_user_menu, render_notifications
+from dashboard.components.cards import render_kpi_cards, render_status_card, render_mini_stat
+from dashboard.components.charts import (
+    create_health_risk_chart, create_load_chart, create_cost_chart,
+    create_incident_distribution_chart, create_recovery_success_chart,
+    create_mttr_trend_chart, create_service_health_heatmap, create_incident_timeline_chart
 )
-from ai_advisor.chatbot import AIAdvisor
+from dashboard.components.tables import (
+    render_incident_table, render_user_table, render_recovery_logs_table,
+    render_filter_bar, render_searchable_table
+)
+from dashboard.components.ai_panel import (
+    render_ai_chat_interface, render_recommendation_cards,
+    render_quick_insights, render_ai_analysis_panel
+)
+from dashboard.sample_data import (
+    generate_kpi_metrics, generate_sample_incidents, generate_recovery_logs,
+    generate_user_data, generate_system_metrics, generate_billing_info,
+    generate_auto_healing_config, generate_notification_settings
+)
+from dashboard.config import APP_CONFIG, COLORS
 
 # Page configuration
 st.set_page_config(
-    page_title="ASF-Guardian",
+    page_title=f"{APP_CONFIG['name']} - {APP_CONFIG['tagline']}",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for modern SaaS style
-st.markdown("""
-<style>
-    .main-header {
-        font-size: 3rem;
-        font-weight: 700;
-        background: linear-gradient(120deg, #2196F3, #00BCD4);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 0;
-    }
-    .sub-header {
-        color: #666;
-        font-size: 1.2rem;
-        margin-bottom: 2rem;
-    }
-    .stMetric {
-        background-color: #f8f9fa;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .status-card {
-        padding: 1.5rem;
-        border-radius: 0.5rem;
-        background-color: white;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        margin-bottom: 1rem;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# API Configuration
-API_BASE_URL = os.getenv("API_URL", "http://localhost:8000")
+# Load custom CSS
+css_path = Path(__file__).parent / "styles.css"
+if css_path.exists():
+    with open(css_path) as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 # Initialize session state
-if 'chat_messages' not in st.session_state:
-    st.session_state.chat_messages = []
+if 'demo_mode' not in st.session_state:
+    st.session_state.demo_mode = True
 
-if 'selected_incident' not in st.session_state:
-    st.session_state.selected_incident = None
+# Render navbar
+render_navbar()
 
+# Render sidebar and get selected page
+selected_page = render_sidebar()
 
-def get_api_data(endpoint: str):
-    """Fetch data from API"""
-    try:
-        response = requests.get(f"{API_BASE_URL}{endpoint}", timeout=5)
-        if response.status_code == 200:
-            return response.json()
-        return None
-    except Exception as e:
-        st.error(f"API Error: {str(e)}")
-        return None
+# Render notifications and user menu
+render_notifications()
+render_user_menu()
 
-
-def post_api_data(endpoint: str, data: dict):
-    """Post data to API"""
-    try:
-        response = requests.post(f"{API_BASE_URL}{endpoint}", json=data, timeout=5)
-        if response.status_code == 200:
-            return response.json()
-        return None
-    except Exception as e:
-        st.error(f"API Error: {str(e)}")
-        return None
-
-
-# Header
-st.markdown('<h1 class="main-header">🛡️ ASF-Guardian</h1>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Enterprise AI Incident & Auto-Healing Platform</p>', unsafe_allow_html=True)
-
-# Sidebar navigation
-st.sidebar.title("📋 Navigation")
-page = st.sidebar.radio(
-    "Go to",
-    ["🏠 Dashboard", "🚨 Incidents", "🤖 AI Advisor", "⚙️ Settings", "📊 Analytics"]
-)
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 🔗 Quick Links")
-st.sidebar.markdown(f"[API Docs]({API_BASE_URL}/docs)")
-st.sidebar.markdown("[GitHub](https://github.com/ravigohel142996/ASF-Guardian-AI-Ops-Platform)")
-
-st.sidebar.markdown("---")
-st.sidebar.info("Built with ❤️ by Ravi")
 
 # ==================== DASHBOARD PAGE ====================
-if page == "🏠 Dashboard":
-    st.header("📊 System Overview")
+if selected_page == "dashboard":
+    st.markdown('<div class="section-header">📊 Dashboard Overview</div>', unsafe_allow_html=True)
     
-    # Fetch stats
-    incident_stats = get_api_data("/api/incidents/stats/summary")
-    recovery_stats = get_api_data("/api/recovery/stats")
+    # KPI Cards
+    kpi_data = generate_kpi_metrics()
+    render_kpi_cards(kpi_data)
     
-    if incident_stats and recovery_stats:
-        # Top metrics
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("Total Incidents", incident_stats.get('total', 0))
-        
-        with col2:
-            st.metric("Open Incidents", incident_stats.get('open', 0), 
-                     delta=None if incident_stats.get('open', 0) == 0 else "⚠️")
-        
-        with col3:
-            st.metric("Auto-Recovered", incident_stats.get('auto_recovered', 0))
-        
-        with col4:
-            success_rate = recovery_stats.get('success_rate', 0)
-            st.metric("Recovery Rate", f"{success_rate}%")
+    st.markdown("<br>", unsafe_allow_html=True)
     
-    st.markdown("---")
+    # Quick Insights
+    render_quick_insights()
     
-    # Charts
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Recent Activity
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown('<div class="section-subheader">🚨 Recent Incidents</div>', unsafe_allow_html=True)
+        incidents = generate_sample_incidents(10)
+        render_incident_table(incidents[:5], show_actions=False)
+    
+    with col2:
+        st.markdown('<div class="section-subheader">📊 Severity Distribution</div>', unsafe_allow_html=True)
+        fig = create_incident_distribution_chart()
+        st.plotly_chart(fig, use_container_width=True)
+
+
+# ==================== SYSTEM OVERVIEW PAGE ====================
+elif selected_page == "system_overview":
+    st.markdown('<div class="section-header">📊 System Overview</div>', unsafe_allow_html=True)
+    
+    # System Metrics
+    metrics = generate_system_metrics()
+    
+    cols = st.columns(4)
+    with cols[0]:
+        render_mini_stat("CPU Usage", f"{metrics['cpu']['current']}%", "🖥️")
+    with cols[1]:
+        render_mini_stat("Memory Usage", f"{metrics['memory']['current']}%", "💾")
+    with cols[2]:
+        render_mini_stat("Disk Usage", f"{metrics['disk']['current']}%", "💿")
+    with cols[3]:
+        render_mini_stat("Response Time", f"{metrics['response_time']['current']}ms", "⚡")
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Charts Row 1
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("📈 Recent Activity")
-        incidents_data = get_api_data("/api/incidents?limit=50")
-        
-        if incidents_data and incidents_data.get('incidents'):
-            incidents = incidents_data['incidents']
-            
-            # Timeline chart
-            timeline_fig = create_incidents_timeline(incidents)
-            if timeline_fig:
-                st.plotly_chart(timeline_fig, use_container_width=True)
-            
-            # Recent incidents
-            st.subheader("🔔 Recent Incidents")
-            recent = incidents[:5]
-            show_incident_table(recent)
-        else:
-            st.info("No incidents found")
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        fig = create_health_risk_chart()
+        st.plotly_chart(fig, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     
     with col2:
-        st.subheader("📊 Statistics")
-        
-        if incidents_data and incidents_data.get('incidents'):
-            # Severity distribution
-            severity_fig = create_severity_distribution(incidents)
-            if severity_fig:
-                st.plotly_chart(severity_fig, use_container_width=True)
-            
-            # Recovery stats
-            if recovery_stats:
-                recovery_fig = create_recovery_stats_chart(recovery_stats)
-                if recovery_fig:
-                    st.plotly_chart(recovery_fig, use_container_width=True)
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        fig = create_load_chart()
+        st.plotly_chart(fig, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     
-    # System metrics (simulated)
-    st.markdown("---")
-    st.subheader("💻 System Health")
-    
-    col1, col2, col3 = st.columns(3)
+    # Charts Row 2
+    col1, col2 = st.columns(2)
     
     with col1:
-        st.metric("CPU Usage", "45%", delta="-5%", delta_color="inverse")
-        st.progress(0.45)
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        fig = create_cost_chart()
+        st.plotly_chart(fig, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     
     with col2:
-        st.metric("Memory Usage", "62%", delta="2%", delta_color="inverse")
-        st.progress(0.62)
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        fig = create_recovery_success_chart()
+        st.plotly_chart(fig, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     
-    with col3:
-        st.metric("Disk Usage", "38%", delta="-1%", delta_color="inverse")
-        st.progress(0.38)
+    # Service Health Heatmap
+    st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+    fig = create_service_health_heatmap()
+    st.plotly_chart(fig, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
-# ==================== INCIDENTS PAGE ====================
-elif page == "🚨 Incidents":
-    st.header("🚨 Incident Management")
+# ==================== INCIDENT MANAGEMENT PAGE ====================
+elif selected_page == "incidents":
+    st.markdown('<div class="section-header">🚨 Incident Management</div>', unsafe_allow_html=True)
     
-    # Tabs
-    tab1, tab2, tab3 = st.tabs(["All Incidents", "Open Incidents", "Create Test Incident"])
+    # Filters
+    filters = render_filter_bar()
     
-    with tab1:
-        st.subheader("All Incidents")
-        
-        incidents_data = get_api_data("/api/incidents?limit=100")
-        
-        if incidents_data and incidents_data.get('incidents'):
-            incidents = incidents_data['incidents']
-            
-            # Filters
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                severity_filter = st.multiselect(
-                    "Filter by Severity",
-                    ["critical", "high", "medium", "low"],
-                    default=[]
-                )
-            
-            with col2:
-                status_filter = st.multiselect(
-                    "Filter by Status",
-                    ["open", "investigating", "resolved", "closed"],
-                    default=[]
-                )
-            
-            # Apply filters
-            filtered = incidents
-            if severity_filter:
-                filtered = [i for i in filtered if i['severity'] in severity_filter]
-            if status_filter:
-                filtered = [i for i in filtered if i['status'] in status_filter]
-            
-            st.write(f"Showing {len(filtered)} incidents")
-            
-            # Display incidents
-            show_incident_table(filtered)
-        else:
-            st.info("No incidents found")
+    st.markdown("<br>", unsafe_allow_html=True)
     
-    with tab2:
-        st.subheader("Open Incidents")
-        
-        open_incidents = get_api_data("/api/incidents?status=open")
-        
-        if open_incidents and open_incidents.get('incidents'):
-            incidents = open_incidents['incidents']
-            
-            if len(incidents) == 0:
-                st.success("✅ No open incidents!")
-            else:
-                st.warning(f"⚠️ {len(incidents)} open incident(s) require attention")
-                show_incident_table(incidents)
-                
-                # Bulk actions
-                st.subheader("Bulk Actions")
-                if st.button("🔄 Attempt Recovery on All"):
-                    with st.spinner("Attempting recovery..."):
-                        for incident in incidents:
-                            result = post_api_data(
-                                "/api/recovery/attempt",
-                                {"incident_id": incident['id']}
-                            )
-                            if result and result.get('success'):
-                                st.success(f"✅ Recovered incident #{incident['id']}")
-                            else:
-                                st.error(f"❌ Failed to recover incident #{incident['id']}")
-                        
-                        time.sleep(1)
-                        st.rerun()
-        else:
-            st.success("✅ No open incidents!")
+    # Generate and filter incidents
+    incidents = generate_sample_incidents(25)
     
-    with tab3:
-        st.subheader("Create Test Incident")
-        st.info("Generate a test incident for demonstration purposes")
-        
-        with st.form("create_incident"):
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                service = st.selectbox(
-                    "Service",
-                    ["web-api", "database", "cache-server", "auth-service", "payment-service"]
-                )
-                metric = st.selectbox(
-                    "Metric",
-                    ["cpu", "memory", "disk", "response_time", "error_rate"]
-                )
-            
-            with col2:
-                severity = st.selectbox("Severity", ["critical", "high", "medium", "low"])
-                
-                # Calculate value based on severity
-                thresholds = {
-                    'cpu': 80, 'memory': 85, 'disk': 90,
-                    'response_time': 5000, 'error_rate': 5
-                }
-                
-                base_threshold = thresholds.get(metric, 100)
-                
-                if severity == 'critical':
-                    value = base_threshold * 1.6
-                elif severity == 'high':
-                    value = base_threshold * 1.3
-                elif severity == 'medium':
-                    value = base_threshold * 1.15
-                else:
-                    value = base_threshold * 1.05
-                
-                st.metric("Generated Value", f"{value:.2f}")
-            
-            submitted = st.form_submit_button("Create Test Incident")
-            
-            if submitted:
-                with st.spinner("Creating incident..."):
-                    result = post_api_data(
-                        "/api/incidents/check",
-                        {
-                            "service_name": service,
-                            "metric_name": metric,
-                            "metric_value": value
-                        }
-                    )
-                    
-                    if result and result.get('status') == 'incident_created':
-                        st.success(f"✅ Test incident created: #{result['incident']['id']}")
-                        st.json(result['incident'])
-                        time.sleep(1)
-                        st.rerun()
-                    else:
-                        st.error("Failed to create incident")
+    # Apply filters
+    if filters['severity']:
+        incidents = [i for i in incidents if i['severity'] in filters['severity']]
+    if filters['status']:
+        incidents = [i for i in incidents if i['status'] in filters['status']]
+    if filters['service']:
+        incidents = [i for i in incidents if i['service_name'] in filters['service']]
+    
+    # Stats cards
+    cols = st.columns(4)
+    with cols[0]:
+        open_count = len([i for i in incidents if i['status'] == 'open'])
+        render_status_card('Open Incidents', 'danger' if open_count > 5 else 'warning', f'{open_count} incidents require attention', '🚨')
+    with cols[1]:
+        critical_count = len([i for i in incidents if i['severity'] == 'critical'])
+        render_status_card('Critical Issues', 'danger' if critical_count > 0 else 'success', f'{critical_count} critical incidents', '🔴')
+    with cols[2]:
+        resolved_count = len([i for i in incidents if i['status'] == 'resolved'])
+        render_status_card('Resolved Today', 'success', f'{resolved_count} incidents resolved', '✅')
+    with cols[3]:
+        auto_recovered = len([i for i in incidents if i.get('auto_recovered')])
+        render_status_card('Auto-Recovered', 'success', f'{auto_recovered} automated fixes', '🤖')
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Incidents table
+    st.markdown('<div class="section-subheader">📋 All Incidents</div>', unsafe_allow_html=True)
+    render_incident_table(incidents)
+    
+    # Timeline chart
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+    fig = create_incident_timeline_chart(incidents)
+    st.plotly_chart(fig, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ==================== AI ADVISOR PAGE ====================
-elif page == "🤖 AI Advisor":
-    st.header("🤖 AI-Powered Advisor")
+elif selected_page == "ai_advisor":
+    st.markdown('<div class="section-header">🤖 AI-Powered Advisor</div>', unsafe_allow_html=True)
     
-    tab1, tab2 = st.tabs(["Chat", "Quick Analysis"])
+    tabs = st.tabs(["💬 Chat", "💡 Recommendations", "🔍 Analysis"])
     
-    with tab1:
-        st.subheader("💬 Chat with AI Advisor")
-        
-        # Chat interface
-        chat_container = st.container()
-        
-        with chat_container:
-            for message in st.session_state.chat_messages:
-                with st.chat_message(message["role"]):
-                    st.write(message["content"])
-        
-        # Chat input
-        user_input = st.chat_input("Ask me anything about incident management...")
-        
-        if user_input:
-            # Add user message
-            st.session_state.chat_messages.append({
-                "role": "user",
-                "content": user_input
-            })
-            
-            # Get AI response
-            with st.spinner("Thinking..."):
-                advisor = AIAdvisor()
-                response = advisor.ask(user_input)
-                advisor.close()
-                
-                if response.get('success'):
-                    answer = response['answer']
-                else:
-                    answer = response.get('answer', 'Sorry, I encountered an error.')
-                
-                st.session_state.chat_messages.append({
-                    "role": "assistant",
-                    "content": answer
-                })
-            
-            st.rerun()
-        
-        # Clear chat button
-        if st.button("🗑️ Clear Chat"):
-            st.session_state.chat_messages = []
-            st.rerun()
+    with tabs[0]:
+        render_ai_chat_interface()
     
-    with tab2:
-        st.subheader("📋 Quick Analysis")
+    with tabs[1]:
+        render_recommendation_cards()
+    
+    with tabs[2]:
+        st.markdown('<div class="section-subheader">🔍 Incident Analysis</div>', unsafe_allow_html=True)
         
-        # Get recent incidents
-        incidents_data = get_api_data("/api/incidents?limit=10")
+        # Incident selector
+        incidents = generate_sample_incidents(10)
+        incident_options = {f"#{i['id']} - {i['title']}": i['id'] for i in incidents}
         
-        if incidents_data and incidents_data.get('incidents'):
-            incidents = incidents_data['incidents']
-            
-            # Select incident to analyze
-            incident_options = {
-                f"#{i['id']} - {i['title']}": i['id']
-                for i in incidents
-            }
-            
-            selected = st.selectbox("Select Incident to Analyze", list(incident_options.keys()))
-            
-            if selected and st.button("🔍 Analyze Incident"):
-                incident_id = incident_options[selected]
-                
-                with st.spinner("Analyzing incident..."):
-                    advisor = AIAdvisor()
-                    analysis = advisor.analyze_incident(incident_id)
-                    advisor.close()
-                    
-                    if analysis.get('success'):
-                        st.success("✅ Analysis Complete")
-                        st.markdown(analysis['answer'])
-                    else:
-                        st.error(analysis.get('message', 'Analysis failed'))
-        else:
-            st.info("No incidents available for analysis")
+        selected = st.selectbox("Select Incident to Analyze", list(incident_options.keys()))
         
-        # Quick tips
-        st.markdown("---")
-        st.subheader("💡 Quick Tips")
+        if selected:
+            incident_id = incident_options[selected]
+            render_ai_analysis_panel(incident_id)
+
+
+# ==================== AUTO-HEALING PAGE ====================
+elif selected_page == "auto_healing":
+    st.markdown('<div class="section-header">⚙️ Auto-Healing Configuration</div>', unsafe_allow_html=True)
+    
+    config = generate_auto_healing_config()
+    
+    # Status card
+    status = 'success' if config['enabled'] else 'warning'
+    render_status_card(
+        'Auto-Healing System',
+        status,
+        'System is actively monitoring and recovering from incidents' if config['enabled'] else 'Auto-healing is currently disabled',
+        '⚙️'
+    )
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Recovery Rules
+    st.markdown('<div class="section-subheader">🔧 Recovery Rules</div>', unsafe_allow_html=True)
+    
+    for rule in config['rules']:
+        enabled_badge = '<span class="badge badge-resolved">ENABLED</span>' if rule['enabled'] else '<span class="badge badge-closed">DISABLED</span>'
         
-        advisor = AIAdvisor()
-        tips = advisor.get_quick_tips()
-        advisor.close()
+        st.markdown(f"""
+        <div class="glass-card" style="margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div style="flex: 1;">
+                    <h4 style="margin: 0; color: var(--text-primary);">{rule['name']}</h4>
+                    <div style="margin-top: 0.5rem;">
+                        {enabled_badge}
+                        <span style="margin-left: 1rem; color: var(--text-secondary);">Success Rate: <strong>{rule['success_rate']}%</strong></span>
+                    </div>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                <div>
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.25rem;">CONDITION</div>
+                    <code style="color: var(--primary-color);">{rule['condition']}</code>
+                </div>
+                <div>
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.25rem;">ACTION</div>
+                    <code style="color: var(--accent-color);">{rule['action']}</code>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Recovery Logs
+    st.markdown('<div class="section-subheader">📜 Recent Recovery Actions</div>', unsafe_allow_html=True)
+    logs = generate_recovery_logs(10)
+    render_recovery_logs_table(logs)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # MTTR Chart
+    st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+    fig = create_mttr_trend_chart()
+    st.plotly_chart(fig, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ==================== ADMIN PANEL PAGE ====================
+elif selected_page == "admin":
+    st.markdown('<div class="section-header">👥 Admin Panel</div>', unsafe_allow_html=True)
+    
+    tabs = st.tabs(["👥 Users", "💳 Billing", "🔔 Notifications"])
+    
+    with tabs[0]:
+        st.markdown('<div class="section-subheader">User Management</div>', unsafe_allow_html=True)
         
-        for tip in tips:
-            st.markdown(f"- {tip}")
+        # Add user button
+        if st.button("➕ Add New User", key="add_user"):
+            st.info("Add user functionality would open a modal here")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # Users table
+        users = generate_user_data()
+        render_user_table(users)
+    
+    with tabs[1]:
+        st.markdown('<div class="section-subheader">💳 Billing & Subscription</div>', unsafe_allow_html=True)
+        
+        billing = generate_billing_info()
+        
+        # Plan info
+        cols = st.columns(3)
+        with cols[0]:
+            render_status_card('Current Plan', 'success', billing['plan'], '📦')
+        with cols[1]:
+            render_status_card('Status', 'success', billing['status'], '✅')
+        with cols[2]:
+            render_status_card('Next Billing', 'info', billing['next_billing_date'], '📅')
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # Usage vs Limits
+        st.markdown('<div class="section-subheader">📊 Usage & Limits</div>', unsafe_allow_html=True)
+        
+        usage_items = [
+            ('Incidents Tracked', billing['current_usage']['incidents_tracked'], billing['plan_limits']['incidents_tracked']),
+            ('API Calls', billing['current_usage']['api_calls'], billing['plan_limits']['api_calls']),
+            ('Storage (GB)', billing['current_usage']['storage_gb'], billing['plan_limits']['storage_gb']),
+            ('Users', billing['current_usage']['users'], billing['plan_limits']['users'])
+        ]
+        
+        for label, current, limit in usage_items:
+            percentage = (current / limit) * 100
+            st.markdown(f"""
+            <div class="glass-card" style="margin-bottom: 1rem;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span style="color: var(--text-secondary);">{label}</span>
+                    <span style="color: var(--text-primary); font-weight: 600;">{current:,} / {limit:,}</span>
+                </div>
+                <div style="background: var(--border-color); height: 8px; border-radius: 4px; overflow: hidden;">
+                    <div style="width: {percentage}%; height: 100%; background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));"></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # Cost breakdown
+        st.markdown('<div class="section-subheader">💰 Cost Breakdown</div>', unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div class="glass-card">
+            <div style="display: flex; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid var(--border-color);">
+                <span>Base Plan</span>
+                <span style="font-weight: 600;">${billing['costs']['base_plan']}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid var(--border-color);">
+                <span>Additional Users</span>
+                <span style="font-weight: 600;">${billing['costs']['additional_users']}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid var(--border-color);">
+                <span>Overage Charges</span>
+                <span style="font-weight: 600;">${billing['costs']['overage_charges']}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 1rem 0 0.5rem 0; font-size: 1.25rem;">
+                <span style="font-weight: 700; color: var(--text-primary);">Total</span>
+                <span style="font-weight: 700; color: var(--primary-color);">${billing['costs']['total']}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with tabs[2]:
+        st.markdown('<div class="section-subheader">🔔 Notification Settings</div>', unsafe_allow_html=True)
+        
+        settings = generate_notification_settings()
+        
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        
+        # Email alerts
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("**Email Alerts**")
+            st.markdown('<small style="color: var(--text-secondary);">Receive email notifications for incidents</small>', unsafe_allow_html=True)
+        with col2:
+            st.toggle("Enable", value=settings['email_alerts'], key="email_alerts")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # Slack integration
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("**Slack Integration**")
+            st.markdown('<small style="color: var(--text-secondary);">Send alerts to Slack channels</small>', unsafe_allow_html=True)
+        with col2:
+            st.toggle("Enable", value=settings['slack_integration'], key="slack")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # PagerDuty integration
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("**PagerDuty Integration**")
+            st.markdown('<small style="color: var(--text-secondary);">Create PagerDuty incidents</small>', unsafe_allow_html=True)
+        with col2:
+            st.toggle("Enable", value=settings['pagerduty_integration'], key="pagerduty")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # Alert configuration
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        
+        st.selectbox("Alert Frequency", ["Immediate", "Every 5 minutes", "Every 15 minutes", "Hourly"], key="freq")
+        st.selectbox("Severity Threshold", ["All", "Low and above", "Medium and above", "High and above", "Critical only"], key="severity_threshold")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ==================== SETTINGS PAGE ====================
-elif page == "⚙️ Settings":
-    st.header("⚙️ Configuration")
+elif selected_page == "settings":
+    st.markdown('<div class="section-header">⚙️ Settings</div>', unsafe_allow_html=True)
     
-    # Alert settings
-    settings = show_alert_settings()
+    tabs = st.tabs(["🔧 General", "🔒 Security", "🔗 Integrations"])
     
-    st.markdown("---")
+    with tabs[0]:
+        st.markdown('<div class="section-subheader">General Settings</div>', unsafe_allow_html=True)
+        
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.text_input("Company Name", value=APP_CONFIG['company'])
+        st.text_input("Support Email", value=APP_CONFIG['support_email'])
+        st.selectbox("Timezone", ["UTC", "America/New_York", "America/Los_Angeles", "Europe/London", "Asia/Tokyo"])
+        st.selectbox("Date Format", ["YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY"])
+        st.markdown('</div>', unsafe_allow_html=True)
     
-    # API Configuration
-    st.subheader("🔗 API Configuration")
+    with tabs[1]:
+        st.markdown('<div class="section-subheader">Security Settings</div>', unsafe_allow_html=True)
+        
+        render_status_card('Security Status', 'success', 'All security features are enabled', '🔒')
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.toggle("Two-Factor Authentication", value=True)
+        st.toggle("Session Timeout (30 minutes)", value=True)
+        st.toggle("IP Whitelisting", value=False)
+        st.toggle("Audit Logging", value=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.text_input("API URL", value=API_BASE_URL, disabled=True)
-        st.text_input("Database", value="SQLite", disabled=True)
-    
-    with col2:
-        api_status = get_api_data("/health")
-        if api_status:
-            st.success("✅ API Connected")
-        else:
-            st.error("❌ API Disconnected")
-    
-    # Environment info
-    st.markdown("---")
-    st.subheader("ℹ️ System Information")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.info("**Platform**\nASF-Guardian v1.0.0")
-    
-    with col2:
-        st.info("**Tech Stack**\nStreamlit + FastAPI")
-    
-    with col3:
-        st.info("**Database**\nSQLite")
+    with tabs[2]:
+        st.markdown('<div class="section-subheader">Integration Settings</div>', unsafe_allow_html=True)
+        
+        integrations = [
+            {"name": "Slack", "status": "Connected", "icon": "💬"},
+            {"name": "PagerDuty", "status": "Not Connected", "icon": "📟"},
+            {"name": "Datadog", "status": "Connected", "icon": "📊"},
+            {"name": "Grafana", "status": "Not Connected", "icon": "📈"}
+        ]
+        
+        for integration in integrations:
+            status_badge = '<span class="badge badge-resolved">Connected</span>' if integration['status'] == 'Connected' else '<span class="badge badge-closed">Not Connected</span>'
+            
+            st.markdown(f"""
+            <div class="glass-card" style="margin-bottom: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <div style="font-size: 2rem;">{integration['icon']}</div>
+                        <div>
+                            <div style="font-weight: 600; color: var(--text-primary);">{integration['name']}</div>
+                            <div style="margin-top: 0.25rem;">{status_badge}</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary" style="padding: 0.5rem 1.5rem;">
+                        {"Configure" if integration['status'] == 'Connected' else "Connect"}
+                    </button>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
 
-# ==================== ANALYTICS PAGE ====================
-elif page == "📊 Analytics":
-    st.header("📊 Advanced Analytics")
-    
-    incidents_data = get_api_data("/api/incidents?limit=100")
-    
-    if incidents_data and incidents_data.get('incidents'):
-        incidents = incidents_data['incidents']
-        
-        # MTTR Chart
-        st.subheader("⏱️ Mean Time To Recovery (MTTR)")
-        mttr_fig = create_mttr_chart(incidents)
-        if mttr_fig:
-            st.plotly_chart(mttr_fig, use_container_width=True)
-        else:
-            st.info("No resolved incidents to analyze")
-        
-        st.markdown("---")
-        
-        # Service analysis
-        st.subheader("🔍 Service Analysis")
-        
-        # Count incidents by service
-        from collections import Counter
-        service_counts = Counter([i['service_name'] for i in incidents])
-        
-        import pandas as pd
-        import plotly.express as px
-        
-        df = pd.DataFrame({
-            'Service': list(service_counts.keys()),
-            'Incidents': list(service_counts.values())
-        })
-        
-        fig = px.bar(
-            df,
-            x='Service',
-            y='Incidents',
-            title='Incidents by Service',
-            color='Incidents',
-            color_continuous_scale='Reds'
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        st.markdown("---")
-        
-        # Trends
-        st.subheader("📈 Trends")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.metric("Average Incidents/Day", "12.5", delta="-2.3")
-            st.metric("Peak Hour", "14:00 - 15:00")
-        
-        with col2:
-            most_affected = df.iloc[0]['Service'] if len(df) > 0 and 'Service' in df.columns else "N/A"
-            st.metric("Most Affected Service", most_affected)
-            st.metric("Common Issue", "High CPU Usage")
-    else:
-        st.info("No data available for analytics")
-
-
-# Footer
-st.markdown("---")
-st.markdown(
-    """
-    <div style='text-align: center; color: #666; padding: 2rem 0;'>
-        <p><strong>ASF-Guardian</strong> - Enterprise AI Incident & Auto-Healing Platform</p>
-        <p>Built with Streamlit, FastAPI, and OpenAI | 
-        <a href='https://github.com/ravigohel142996/ASF-Guardian-AI-Ops-Platform' target='_blank'>GitHub</a></p>
+# ==================== FOOTER ====================
+st.markdown("<br><br>", unsafe_allow_html=True)
+st.markdown(f"""
+<div class="dashboard-footer">
+    <div class="footer-content">
+        <div class="footer-section">
+            <div class="footer-title">{APP_CONFIG['name']}</div>
+            <div class="footer-text">Version {APP_CONFIG['version']}</div>
+            <div class="footer-text">{APP_CONFIG['company']}</div>
+        </div>
+        <div class="footer-section">
+            <div class="footer-title">Support</div>
+            <div class="footer-text">{APP_CONFIG['support_email']}</div>
+            <div class="footer-text">24/7 Support Available</div>
+        </div>
+        <div class="footer-section">
+            <div class="footer-title">Security</div>
+            <div class="footer-text">🔒 SOC 2 Compliant</div>
+            <div class="footer-text">🛡️ ISO 27001 Certified</div>
+        </div>
+        <div class="footer-section">
+            <div class="footer-title">Links</div>
+            <div class="footer-text"><a href="#" style="color: var(--primary-color);">Documentation</a></div>
+            <div class="footer-text"><a href="#" style="color: var(--primary-color);">API Reference</a></div>
+        </div>
     </div>
-    """,
-    unsafe_allow_html=True
-)
+    <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border-color); text-align: center; color: var(--text-secondary);">
+        © 2024 {APP_CONFIG['company']}. All rights reserved. | Built with Streamlit & FastAPI
+    </div>
+</div>
+""", unsafe_allow_html=True)
