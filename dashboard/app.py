@@ -5,7 +5,6 @@ Version 2.0.0
 """
 import streamlit as st
 import sys
-import os
 from pathlib import Path
 
 # Add parent directory to path
