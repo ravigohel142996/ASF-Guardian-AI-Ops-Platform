@@ -47,7 +47,7 @@ def get_chart_layout(title=""):
 def create_health_risk_chart():
     """Create line chart showing Health vs Risk over time"""
     # Generate sample data
-    dates = pd.date_range(end=datetime.now(), periods=30, freq='D')
+    dates = pd.date_range(end=datetime.now(), periods=30, freq='d')
     
     health = [95 - i * 0.5 + random.randint(-3, 3) for i in range(30)]
     risk = [10 + i * 0.3 + random.randint(-2, 2) for i in range(30)]
@@ -83,7 +83,7 @@ def create_health_risk_chart():
 def create_load_chart():
     """Create area chart showing system load"""
     # Generate sample data
-    hours = pd.date_range(end=datetime.now(), periods=24, freq='H')
+    hours = pd.date_range(end=datetime.now(), periods=24, freq='h')
     
     cpu_load = [30 + i * 2 + random.randint(-5, 10) for i in range(24)]
     memory_load = [40 + i * 1.5 + random.randint(-5, 10) for i in range(24)]
@@ -282,7 +282,7 @@ def create_incident_timeline_chart(incidents=None):
     """Create timeline chart showing incident occurrences"""
     if not incidents or len(incidents) == 0:
         # Sample data
-        dates = pd.date_range(end=datetime.now(), periods=10, freq='H')
+        dates = pd.date_range(end=datetime.now(), periods=10, freq='h')
         incidents_count = [random.randint(0, 5) for _ in range(10)]
     else:
         # Parse real incidents data
