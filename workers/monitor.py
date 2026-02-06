@@ -56,17 +56,17 @@ def monitor_system_health():
         cpu_incident = detector.check_metric('system', 'cpu', cpu_percent)
         if cpu_incident:
             incidents.append(cpu_incident)
-            trigger_recovery(cpu_incident['id'])
+            trigger_recovery.delay(cpu_incident['id'])
         
         memory_incident = detector.check_metric('system', 'memory', memory_percent)
         if memory_incident:
             incidents.append(memory_incident)
-            trigger_recovery(memory_incident['id'])
+            trigger_recovery.delay(memory_incident['id'])
         
         disk_incident = detector.check_metric('system', 'disk', disk_percent)
         if disk_incident:
             incidents.append(disk_incident)
-            trigger_recovery(disk_incident['id'])
+            trigger_recovery.delay(disk_incident['id'])
         
         detector.close()
         
@@ -115,7 +115,7 @@ def monitor_services():
             incident = detector.check_metric(service, 'response_time', response_time)
             if incident:
                 incidents.append(incident)
-                trigger_recovery(incident['id'])
+                trigger_recovery.delay(incident['id'])
         
         detector.close()
         

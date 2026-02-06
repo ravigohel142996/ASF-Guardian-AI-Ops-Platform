@@ -537,7 +537,8 @@ elif page == "📊 Analytics":
             st.metric("Peak Hour", "14:00 - 15:00")
         
         with col2:
-            st.metric("Most Affected Service", df.iloc[0]['Service'] if len(df) > 0 else "N/A")
+            most_affected = df.iloc[0]['Service'] if len(df) > 0 and 'Service' in df.columns else "N/A"
+            st.metric("Most Affected Service", most_affected)
             st.metric("Common Issue", "High CPU Usage")
     else:
         st.info("No data available for analytics")

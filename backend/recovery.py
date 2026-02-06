@@ -100,7 +100,7 @@ class AutoRecovery:
     
     def _extract_metric_from_incident(self, incident: Incident) -> str:
         """Extract metric type from incident error message"""
-        error_msg = incident.error_message.lower()
+        error_msg = (incident.error_message or '').lower()
         
         for metric in ['cpu', 'memory', 'disk', 'response_time', 'error_rate']:
             if metric in error_msg:

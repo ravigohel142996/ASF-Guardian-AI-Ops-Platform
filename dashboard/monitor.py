@@ -287,8 +287,10 @@ def create_mttr_chart(incidents: list):
     
     mttr_data = []
     for inc in resolved_incidents:
-        detected = datetime.fromisoformat(inc['detected_at'].replace('Z', '+00:00'))
-        resolved = datetime.fromisoformat(inc['resolved_at'].replace('Z', '+00:00'))
+        detected_str = inc['detected_at'].replace('Z', '+00:00') if inc['detected_at'].endswith('Z') else inc['detected_at']
+        resolved_str = inc['resolved_at'].replace('Z', '+00:00') if inc['resolved_at'].endswith('Z') else inc['resolved_at']
+        detected = datetime.fromisoformat(detected_str)
+        resolved = datetime.fromisoformat(resolved_str)
         recovery_time = (resolved - detected).total_seconds() / 60  # minutes
         
         mttr_data.append({
