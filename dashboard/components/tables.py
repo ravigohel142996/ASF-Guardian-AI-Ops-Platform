@@ -80,7 +80,7 @@ def render_incident_table(incidents, show_actions=True):
                 hours = int(duration.total_seconds() / 3600)
                 minutes = int((duration.total_seconds() % 3600) / 60)
                 duration_str = f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
-            except:
+            except (ValueError, TypeError, AttributeError) as e:
                 created_str = str(created)[:16]
                 duration_str = "N/A"
         else:
